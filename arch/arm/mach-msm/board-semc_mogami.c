@@ -34,6 +34,8 @@
 #include <linux/power_supply.h>
 #include <linux/i2c/isa1200.h>
 #include <linux/i2c/tsc2007.h>
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
 #include <linux/input/cy8c_ts.h>
@@ -273,6 +275,7 @@
 #define VREG_L15	"gp6"	/* LCD */
 #define VREG_L20	"gp13"	/* Touch */
 
+#define WILINK_UART_DEV_NAME    "/dev/ttyHS0"
 
 /* Platform specific HW-ID GPIO mask */
 static const u8 hw_id_gpios[] = {150, 149, 148, 43};
@@ -5056,10 +5059,81 @@ static int bluetooth_power(int on)
 	return 0;
 }
 
-static struct platform_device mogami_device_rfkill = {
-	.name = "mogami-rfkill",
-	.dev.platform_data = &bluetooth_power,
+static struct wake_lock wilink_wk_lock;
+
+static int wilink_enable(struct kim_data_s *data)
+{
+	bluetooth_power(1);
+	wake_lock(&wilink_wk_lock);
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static int wilink_disable(struct kim_data_s *data)
+{
+	bluetooth_power(0);
+	wake_unlock(&wilink_wk_lock);
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static int wilink_awake(struct kim_data_s *data)
+{
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+static int wilink_asleep(struct kim_data_s *data)
+{
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+int wilink_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+int wilink_resume(struct platform_device *pdev)
+{
+	pr_info("%s\n", __func__);
+	return 0;
+}
+
+/* wl128x BT, FM, GPS connectivity chip */
+static struct ti_st_plat_data wilink_pdata = {
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+	.chip_enable = wilink_enable,
+	.chip_disable = wilink_disable,
+	.chip_awake = wilink_awake,
+	.chip_asleep = wilink_asleep,
+	.suspend = wilink_suspend,
+	.resume = wilink_resume,
 };
+
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
+/* wl127x BT, FM, GPS connectivity chip */
+static struct platform_device wl1271_device = {
+	.name   = "kim",
+	.id     = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static noinline void __init mogami_bt_wl1271(void)
+{
+	wake_lock_init(&wilink_wk_lock, WAKE_LOCK_SUSPEND, "wilink_wk_lock");
+	platform_device_register(&wl1271_device);
+	platform_device_register(&btwilink_device);
+
+	return;
+}
 #endif
 
 static struct regulator *atv_s4, *atv_ldo9;
@@ -5460,9 +5534,6 @@ static struct platform_device *devices[] __initdata = {
 #endif
 #ifdef CONFIG_MOGAMI_SLIDER
 	&slider_device_mogami,
-#endif
-#ifdef CONFIG_BT
-	&mogami_device_rfkill,
 #endif
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 	&ram_console_device,
@@ -6979,6 +7050,7 @@ static void __init msm7x30_init(void)
 	msm7x30_init_nand();
 #ifdef CONFIG_BT
 	bluetooth_power(0);
+	mogami_bt_wl1271();
 #endif
 	atv_dac_power_init();
 #ifdef CONFIG_BOSCH_BMA150

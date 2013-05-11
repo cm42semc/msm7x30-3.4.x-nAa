@@ -34,8 +34,10 @@
 #include <linux/power_supply.h>
 #include <linux/i2c/isa1200.h>
 #include <linux/i2c/tsc2007.h>
+#ifdef CONFIG_MOGAMI_BT_WILINK
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
+#endif
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
 #include <linux/input/cy8c_ts.h>
@@ -275,7 +277,9 @@
 #define VREG_L15	"gp6"	/* LCD */
 #define VREG_L20	"gp13"	/* Touch */
 
+#ifdef CONFIG_MOGAMI_BT_WILINK
 #define WILINK_UART_DEV_NAME    "/dev/ttyHS0"
+#endif
 
 /* Platform specific HW-ID GPIO mask */
 static const u8 hw_id_gpios[] = {150, 149, 148, 43};
@@ -5059,6 +5063,7 @@ static int bluetooth_power(int on)
 	return 0;
 }
 
+#ifdef CONFIG_MOGAMI_BT_WILINK
 static struct wake_lock wilink_wk_lock;
 
 static int wilink_enable(struct kim_data_s *data)
@@ -5134,6 +5139,12 @@ static noinline void __init mogami_bt_wl1271(void)
 
 	return;
 }
+#else
+static struct platform_device mogami_device_rfkill = {
+	.name = "mogami-rfkill",
+	.dev.platform_data = &bluetooth_power,
+};
+#endif
 #endif
 
 static struct regulator *atv_s4, *atv_ldo9;
@@ -5534,6 +5545,11 @@ static struct platform_device *devices[] __initdata = {
 #endif
 #ifdef CONFIG_MOGAMI_SLIDER
 	&slider_device_mogami,
+#endif
+#ifdef CONFIG_BT
+#ifndef CONFIG_MOGAMI_BT_WILINK
+	&mogami_device_rfkill,
+#endif
 #endif
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 	&ram_console_device,
@@ -7050,7 +7066,9 @@ static void __init msm7x30_init(void)
 	msm7x30_init_nand();
 #ifdef CONFIG_BT
 	bluetooth_power(0);
+#ifdef CONFIG_MOGAMI_BT_WILINK
 	mogami_bt_wl1271();
+#endif
 #endif
 	atv_dac_power_init();
 #ifdef CONFIG_BOSCH_BMA150

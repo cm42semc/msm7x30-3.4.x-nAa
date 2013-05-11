@@ -22,15 +22,12 @@ OBJS		+= sdhi-shmobile.o
 OBJS		+= sdhi-sh7372.o
 endif
 
-AFLAGS_head.o := -DTEXT_OFFSET=$(TEXT_OFFSET)
+AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
 AFLAGS_head.o += -Wa,-march=armv7-a$(plus_sec)
-HEAD = head.o
-
 AFLAGS_misc.o +=-Wa,-march=armv7-a$(plus_sec)
-MISC = misc.o
-
 AFLAGS_decompress.o += -Wa,-march=armv7-a$(plus_sec)
-DECOMPRESS = decompress.o
+HEAD	= head.o
+OBJS	+= misc.o decompress.o
 
 FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
 
@@ -166,6 +163,7 @@ $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
 # For __aeabi_llsl
 ashldi3 = $(obj)/ashldi3.o
 
+AFLAGS_ashldi3.o +=-Wa,-march=armv7-a$(plus_sec)
 $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
 	$(call cmd,shipped)
 
@@ -189,11 +187,13 @@ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
 	false; \
 fi
 
-$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/$(MISC) $(DECOMPRESS) $(obj)/piggy.$(suffix_y).o \
-		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
-	@$(check_for_multiple_zreladdr)
-	$(call if_changed,ld)
-	@$(check_for_bad_syms)
+$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
+@$(check_for_multiple_zreladdr)
+$(call if_changed,ld)
+@$(check_for_bad_syms)
+
+
 
 $(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
 	$(call if_changed,$(suffix_y))

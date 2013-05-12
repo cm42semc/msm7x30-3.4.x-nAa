@@ -5031,43 +5031,55 @@ static struct msm_panel_common_pdata mdp_pdata = {
 };
 
 #ifdef CONFIG_BT
+#define BT_GPIO_UART1DM_RFR_N 134
+#define BT_GPIO_UART1DM_CTS_N 135
+#define BT_GPIO_UART1DM_RXD 136
+#define BT_GPIO_ART1DM_TXD 137
+#define BT_GPIO_EN 103	// =EXT_WAKE
+
+static int bt_on;
+
 static uint32_t bt_config_on_gpios[] = {
-	GPIO_CFG(134, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
-	GPIO_CFG(135, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(136, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(137, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
-	GPIO_CFG(103, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_UART1DM_RFR_N, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(BT_GPIO_UART1DM_CTS_N, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_UART1DM_RXD, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_ART1DM_TXD, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(BT_GPIO_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t bt_config_off_gpios[] = {
-	GPIO_CFG(134, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(135, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(136, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(137, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(103, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_UART1DM_RFR_N, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_UART1DM_CTS_N, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_UART1DM_RXD, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_ART1DM_TXD, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(BT_GPIO_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
+
+static void bluetooth_init(void)
+{
+	config_gpio_table(bt_config_off_gpios, ARRAY_SIZE(bt_config_off_gpios));
+	gpio_set_value(BT_GPIO_EN, 0);
+	bt_on = 0;
+}
 
 static int bluetooth_power(int on)
 {
-	if (on) {
-		config_gpio_table(bt_config_on_gpios,
-				  ARRAY_SIZE(bt_config_on_gpios));
-		gpio_set_value(103, 1);
-	} else {
-		gpio_set_value(103, 0);
-		config_gpio_table(bt_config_off_gpios,
-				  ARRAY_SIZE(bt_config_off_gpios));
+	// Do we need a spinlock here?
+	if (on && !bt_on) {
+		config_gpio_table(bt_config_on_gpios, ARRAY_SIZE(bt_config_on_gpios));
+		gpio_set_value(BT_GPIO_EN, 1);
+	} else if (!on && bt_on) {
+		config_gpio_table(bt_config_off_gpios, ARRAY_SIZE(bt_config_off_gpios));
+		gpio_set_value(BT_GPIO_EN, 0);
 	}
+	bt_on = on;
 	return 0;
 }
 
 #ifdef CONFIG_MOGAMI_BT_WILINK
-static struct wake_lock wilink_wk_lock;
-
 static int wilink_enable(struct kim_data_s *data)
 {
 	bluetooth_power(1);
-	wake_lock(&wilink_wk_lock);
 	pr_info("%s\n", __func__);
 	return 0;
 }
@@ -5075,7 +5087,6 @@ static int wilink_enable(struct kim_data_s *data)
 static int wilink_disable(struct kim_data_s *data)
 {
 	bluetooth_power(0);
-	wake_unlock(&wilink_wk_lock);
 	pr_info("%s\n", __func__);
 	return 0;
 }
@@ -5104,7 +5115,6 @@ int wilink_resume(struct platform_device *pdev)
 	return 0;
 }
 
-/* wl128x BT, FM, GPS connectivity chip */
 static struct ti_st_plat_data wilink_pdata = {
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
@@ -5129,12 +5139,10 @@ static struct platform_device wl1271_device = {
 	.dev.platform_data = &wilink_pdata,
 };
 
-static noinline void __init mogami_bt_wl1271(void)
+static noinline void __init mogami_wl1271_wilink(void)
 {
-	wake_lock_init(&wilink_wk_lock, WAKE_LOCK_SUSPEND, "wilink_wk_lock");
 	platform_device_register(&wl1271_device);
 	platform_device_register(&btwilink_device);
-
 	return;
 }
 #else
@@ -7059,9 +7067,9 @@ static void __init msm7x30_init(void)
 	msm_qsd_spi_init();
 	msm7x30_init_nand();
 #ifdef CONFIG_BT
-	bluetooth_power(0);
+	bluetooth_init();
 #ifdef CONFIG_MOGAMI_BT_WILINK
-	mogami_bt_wl1271();
+	mogami_wl1271_wilink();
 #endif
 #endif
 	atv_dac_power_init();

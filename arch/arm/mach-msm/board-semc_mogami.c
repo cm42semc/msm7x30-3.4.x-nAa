@@ -5115,7 +5115,6 @@ int wilink_resume(struct platform_device *pdev)
 	return 0;
 }
 
-/* wl128x BT, FM, GPS connectivity chip */
 static struct ti_st_plat_data wilink_pdata = {
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
@@ -5140,7 +5139,7 @@ static struct platform_device wl1271_device = {
 	.dev.platform_data = &wilink_pdata,
 };
 
-static noinline void __init mogami_bt_wl1271(void)
+static noinline void __init mogami_wl1271_wilink(void)
 {
 	platform_device_register(&wl1271_device);
 	platform_device_register(&btwilink_device);
@@ -7070,7 +7069,7 @@ static void __init msm7x30_init(void)
 #ifdef CONFIG_BT
 	bluetooth_init();
 #ifdef CONFIG_MOGAMI_BT_WILINK
-	mogami_bt_wl1271();
+	mogami_wl1271_wilink();
 #endif
 #endif
 	atv_dac_power_init();

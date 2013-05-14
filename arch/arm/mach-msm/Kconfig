@@ -1908,15 +1908,6 @@ config MOGAMI_VIBRATOR_ON_VOLTAGE
 	help
 	  Set value in milli voltage(mV). Default voltage is 2700mV.
 
-config MOGAMI_BT_WILINK
-	bool "Mogami TI Wilink support"
-	select BT_WILINK
-	select TI_ST
-	select ST_HCI
-	select UHID
-	help
-	  Mogami TI Wilink support
-
 config MSM_SLEEP_TIME_OVERRIDE
 	bool "Allow overriding suspend/sleep time with PM module parameter"
 	default y

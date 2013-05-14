@@ -34,10 +34,6 @@
 #include <linux/power_supply.h>
 #include <linux/i2c/isa1200.h>
 #include <linux/i2c/tsc2007.h>
-#ifdef CONFIG_MOGAMI_BT_WILINK
-#include <linux/skbuff.h>
-#include <linux/ti_wilink_st.h>
-#endif
 #include <linux/input/kp_flip_switch.h>
 #include <linux/leds-pmic8058.h>
 #include <linux/input/cy8c_ts.h>
@@ -277,9 +273,6 @@
 #define VREG_L15	"gp6"	/* LCD */
 #define VREG_L20	"gp13"	/* Touch */
 
-#ifdef CONFIG_MOGAMI_BT_WILINK
-#define WILINK_UART_DEV_NAME    "/dev/ttyHS0"
-#endif
 
 /* Platform specific HW-ID GPIO mask */
 static const u8 hw_id_gpios[] = {150, 149, 148, 43};
@@ -5031,126 +5024,40 @@ static struct msm_panel_common_pdata mdp_pdata = {
 };
 
 #ifdef CONFIG_BT
-#define BT_GPIO_UART1DM_RFR_N 134
-#define BT_GPIO_UART1DM_CTS_N 135
-#define BT_GPIO_UART1DM_RXD 136
-#define BT_GPIO_ART1DM_TXD 137
-#define BT_GPIO_EN 103	// =EXT_WAKE
-
-static int bt_on;
-
 static uint32_t bt_config_on_gpios[] = {
-	GPIO_CFG(BT_GPIO_UART1DM_RFR_N, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
-	GPIO_CFG(BT_GPIO_UART1DM_CTS_N, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_UART1DM_RXD, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_ART1DM_TXD, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
-	GPIO_CFG(BT_GPIO_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(134, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(135, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(136, 1, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(137, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(103, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t bt_config_off_gpios[] = {
-	GPIO_CFG(BT_GPIO_UART1DM_RFR_N, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_UART1DM_CTS_N, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_UART1DM_RXD, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_ART1DM_TXD, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(BT_GPIO_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(134, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(135, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(136, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(137, 0, GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(103, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
-
-static void bluetooth_init(void)
-{
-	config_gpio_table(bt_config_off_gpios, ARRAY_SIZE(bt_config_off_gpios));
-	gpio_set_value(BT_GPIO_EN, 0);
-	bt_on = 0;
-}
 
 static int bluetooth_power(int on)
 {
-	// Do we need a spinlock here?
-	if (on && !bt_on) {
-		config_gpio_table(bt_config_on_gpios, ARRAY_SIZE(bt_config_on_gpios));
-		gpio_set_value(BT_GPIO_EN, 1);
-	} else if (!on && bt_on) {
-		config_gpio_table(bt_config_off_gpios, ARRAY_SIZE(bt_config_off_gpios));
-		gpio_set_value(BT_GPIO_EN, 0);
+	if (on) {
+		config_gpio_table(bt_config_on_gpios,
+				  ARRAY_SIZE(bt_config_on_gpios));
+		gpio_set_value(103, 1);
+	} else {
+		gpio_set_value(103, 0);
+		config_gpio_table(bt_config_off_gpios,
+				  ARRAY_SIZE(bt_config_off_gpios));
 	}
-	bt_on = on;
 	return 0;
 }
 
-#ifdef CONFIG_MOGAMI_BT_WILINK
-static int wilink_enable(struct kim_data_s *data)
-{
-	bluetooth_power(1);
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-static int wilink_disable(struct kim_data_s *data)
-{
-	bluetooth_power(0);
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-static int wilink_awake(struct kim_data_s *data)
-{
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-static int wilink_asleep(struct kim_data_s *data)
-{
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-int wilink_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-int wilink_resume(struct platform_device *pdev)
-{
-	pr_info("%s\n", __func__);
-	return 0;
-}
-
-static struct ti_st_plat_data wilink_pdata = {
-	.dev_name = WILINK_UART_DEV_NAME,
-	.flow_cntrl = 1,
-	.baud_rate = 3000000,
-	.chip_enable = wilink_enable,
-	.chip_disable = wilink_disable,
-	.chip_awake = wilink_awake,
-	.chip_asleep = wilink_asleep,
-	.suspend = wilink_suspend,
-	.resume = wilink_resume,
-};
-
-static struct platform_device btwilink_device = {
-	.name = "btwilink",
-	.id = -1,
-};
-
-/* wl127x BT, FM, GPS connectivity chip */
-static struct platform_device wl1271_device = {
-	.name   = "kim",
-	.id     = -1,
-	.dev.platform_data = &wilink_pdata,
-};
-
-static noinline void __init mogami_wl1271_wilink(void)
-{
-	platform_device_register(&wl1271_device);
-	platform_device_register(&btwilink_device);
-	return;
-}
-#else
 static struct platform_device mogami_device_rfkill = {
 	.name = "mogami-rfkill",
 	.dev.platform_data = &bluetooth_power,
 };
-#endif
 #endif
 
 static struct regulator *atv_s4, *atv_ldo9;
@@ -5553,9 +5460,7 @@ static struct platform_device *devices[] __initdata = {
 	&slider_device_mogami,
 #endif
 #ifdef CONFIG_BT
-#ifndef CONFIG_MOGAMI_BT_WILINK
 	&mogami_device_rfkill,
-#endif
 #endif
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 	&ram_console_device,
@@ -7067,10 +6972,7 @@ static void __init msm7x30_init(void)
 	msm_qsd_spi_init();
 	msm7x30_init_nand();
 #ifdef CONFIG_BT
-	bluetooth_init();
-#ifdef CONFIG_MOGAMI_BT_WILINK
-	mogami_wl1271_wilink();
-#endif
+	bluetooth_power(0);
 #endif
 	atv_dac_power_init();
 #ifdef CONFIG_BOSCH_BMA150

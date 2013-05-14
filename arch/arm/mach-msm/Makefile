@@ -324,6 +324,9 @@ obj-$(CONFIG_MACH_SEMC_HALLON) += board-semc_mogami.o leds-hallon.o vibrator-mog
 obj-$(CONFIG_MACH_SEMC_SATSUMA) += board-semc_mogami.o board-semc_mogami-rfkill.o keypad-satsuma.o leds-satsuma.o gpio-satsuma.o charger-satsuma.o board-semc_mogami-wifi.o touch-satsuma.o vibrator-mogami.o
 endif
 
+bluedroid-objs	= board-semc_mogami-bluedroid.o
+obj-$(CONFIG_MOGAMI_BLUEDROID) += bluedroid.o
+
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire.o board-sapphire-gpio.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-keypad.o board-sapphire-panel.o
 obj-$(CONFIG_MACH_SAPPHIRE) += board-sapphire-mmc.o board-sapphire-wifi.o

@@ -197,7 +197,7 @@
 #ifdef CONFIG_FB_MSM_HDPI
 #define MSM_PMEM_SF_SIZE  0x1C00000
 #else
-#define MSM_PMEM_SF_SIZE  0x1600000
+#define MSM_PMEM_SF_SIZE  0x1E00000
 #endif
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE   (864 * 480 * 4 * 3) /* 4bpp * 3 Pages */
@@ -220,7 +220,7 @@
 
 #define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)
 
-#define MSM_PMEM_ADSP_SIZE      0x1C00000
+#define MSM_PMEM_ADSP_SIZE      0x2F00000
 #define MSM_FLUID_PMEM_ADSP_SIZE	0x2800000
 #define PMEM_KERNEL_EBI0_SIZE   0x600000
 
@@ -3541,7 +3541,7 @@ static char *semc_bdata_supplied_to[] = {
 static struct semc_battery_platform_data semc_battery_platform_data = {
 	.supplied_to = semc_bdata_supplied_to,
 	.num_supplicants = ARRAY_SIZE(semc_bdata_supplied_to),
-#ifndef CONFIG_BATTERY_BQ27520
+#ifndef CONFIG_BATTERY_BQ27520_SEMC
 	.use_fuelgauge = 1,
 #endif
 };
@@ -3572,7 +3572,7 @@ struct bq27520_platform_data bq27520_platform_data = {
 	.num_supplicants = ARRAY_SIZE(bq27520_supplied_to),
 	.lipo_bat_max_volt = LIPO_BAT_MAX_VOLTAGE,
 	.lipo_bat_min_volt = LIPO_BAT_MIN_VOLTAGE,
-#ifdef CONFIG_BATTERY_BQ27520
+#ifdef CONFIG_BATTERY_BQ27520_SEMC
 	.battery_dev_name = SEMC_BDATA_NAME,
 #endif
 	.polling_lower_capacity = FULLY_CHARGED_AND_RECHARGE_CAP,
